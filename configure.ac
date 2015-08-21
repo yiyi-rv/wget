@@ -820,6 +820,7 @@ AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile util/Makefile
                  include/Makefile
                  libwget/Makefile
                  src2/Makefile
+                 examples/Makefile
                  po/Makefile.in tests/Makefile
                  lib/Makefile testenv/Makefile])
 AC_CONFIG_HEADERS([src/config.h])
