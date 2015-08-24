@@ -311,6 +311,8 @@ char *
 	wget_charset_transcode(const char *src, const char *src_encoding, const char *dst_encoding) G_GNUC_WGET_MALLOC;
 int
 	wget_str_needs_encoding(const char *s) G_GNUC_WGET_NONNULL((1)) G_GNUC_WGET_PURE;
+int
+	wget_str_is_valid_utf8(const char *utf8) G_GNUC_WGET_NONNULL((1)) G_GNUC_WGET_PURE;
 char *
 	wget_str_to_utf8(const char *src, const char *encoding) G_GNUC_WGET_MALLOC;
 char *
