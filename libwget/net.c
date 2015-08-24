@@ -609,7 +609,7 @@ int wget_tcp_connect(wget_tcp_t *tcp, const char *host, const char *port)
 							break; /* stop here - the server cert couldn't be validated */
 						}
 						
-						// do not
+						// do not free tcp->addrinfo when calling mget_tcp_close()
 						struct addrinfo *ai_tmp = tcp->addrinfo;
 						tcp->addrinfo = NULL;
 						wget_tcp_close(tcp);
@@ -721,8 +721,7 @@ wget_tcp_t *wget_tcp_accept(wget_tcp_t *parent_tcp)
 		tcp->bind_addrinfo = NULL;
 
 		if (tcp->ssl) {
-			tcp->ssl_session = wget_ssl_server_open(tcp->sockfd, tcp->connect_timeout);
-			if (!tcp->ssl_session)
+			if (wget_tcp_tls_start(tcp))
 				wget_tcp_deinit(&tcp);
 		}
 
@@ -734,11 +733,38 @@ wget_tcp_t *wget_tcp_accept(wget_tcp_t *parent_tcp)
 	return NULL;
 }
 
+int wget_tcp_tls_start(wget_tcp_t *tcp)
+{
+	int ret;
+
+	// TODO: unify wget_ssl_open and wget_ssl_server_open
+	if (tcp->passive) {
+		if ((tcp->ssl_session = wget_ssl_server_open(tcp->sockfd, tcp->connect_timeout))) {
+			return 0;
+		}
+		ret = WGET_E_UNKNOWN;
+	} else {
+		return wget_ssl_open(tcp);
+	}
+
+	return ret;
+}
+
+void mget_tcp_tls_stop(wget_tcp_t *tcp)
+{
+	if (tcp->ssl_session) {
+		if (tcp->passive)
+			wget_ssl_server_close(&tcp->ssl_session);
+		else
+			wget_ssl_close(&tcp->ssl_session);
+	}
+}
+
 ssize_t wget_tcp_read(wget_tcp_t *tcp, char *buf, size_t count)
 {
 	ssize_t rc;
 
-	if (tcp->ssl) {
+	if (tcp->ssl_session) {
 		rc = wget_ssl_read_timeout(tcp->ssl_session, buf, count, tcp->timeout);
 	} else {
 		// 0: no timeout / immediate
