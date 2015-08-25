@@ -40,7 +40,7 @@
 #include <libwget.h>
 #include "private.h"
 
-#ifdef HAVE_DPRINTF
+#ifndef HAVE_DPRINTF
 
 // just a fallback, if dprintf/vdprintf do not exist
 
