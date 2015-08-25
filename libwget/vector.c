@@ -386,10 +386,22 @@ void wget_vector_set_destructor(wget_vector_t *v, void (*destructor)(void *elem)
 		v->destructor = destructor;
 }
 
-#if HAVE_QSORT_R
+#if HAVE_QSORT_R_BSD
+static int G_GNUC_WGET_NONNULL_ALL _compare(void *v, const void *p1, const void *p2)
+{
+	return ((wget_vector_t *)v)->cmp(*((void **)p1), *((void **)p2));
+}
+#elif HAVE_QSORT_R
 static int G_GNUC_WGET_NONNULL_ALL _compare(const void *p1, const void *p2, void *v)
 {
 	return ((wget_vector_t *)v)->cmp(*((void **)p1), *((void **)p2));
+}
+#else
+// fallback to non-reentrant code (e.g. for OpenBSD <= 5.8)
+static wget_vector_t *_v;
+static int G_GNUC_WGET_NONNULL_ALL _compare(const void *p1, const void *p2)
+{
+	return _v->cmp(*((void **)p1), *((void **)p2));
 }
 #endif
 
@@ -404,12 +416,33 @@ void wget_vector_sort(wget_vector_t *v)
  * Using BLOCKS would also need a qsort_b() function...
  *
  */
-#if HAVE_QSORT_R
+#if HAVE_QSORT_R_BSD
+	if (v && v->cmp) {
+		qsort_r(v->entry, v->cur, sizeof(void *), v, _compare);
+		v->sorted = 1;
+	}
+#elif HAVE_QSORT_R
 	if (v && v->cmp) {
 		qsort_r(v->entry, v->cur, sizeof(void *), _compare, v);
 		v->sorted = 1;
 	}
-#elif !defined(__clang__)
+#else
+	// fallback to non-reentrant code (e.g. for OpenBSD <= 5.8)
+	if (v && v->cmp) {
+		static wget_thread_mutex_t
+			mutex = WGET_THREAD_MUTEX_INITIALIZER;
+
+		wget_thread_mutex_lock(&mutex);
+		_v = v;
+		qsort(v->entry, v->cur, sizeof(void *), _compare);
+		v->sorted = 1;
+		wget_thread_mutex_unlock(&mutex);
+	}
+
+#endif
+
+/*
+	// trampoline version (e.g. gcc, but not on OpenBSD !)
 	int G_GNUC_WGET_NONNULL_ALL _compare(const void *p1, const void *p2)
 	{
 		return v->cmp(*((void **)p1), *((void **)p2));
@@ -419,9 +452,8 @@ void wget_vector_sort(wget_vector_t *v)
 		qsort(v->entry, v->cur, sizeof(void *), _compare);
 		v->sorted = 1;
 	}
-#else
-#error You need gcc or qsort_r() to build Wget
-/*
+
+	#error You need gcc or qsort_r() to build Wget
 	// this should work as soon as the qsort_b() function is available ;-)
 	if (v && v->cmp) {
 		int (^_compare)(const void *, const void *) = ^ int (const void *p1, const void *p2) {
@@ -432,7 +464,6 @@ void wget_vector_sort(wget_vector_t *v)
 		v->sorted = 1;
 	}
 */
-#endif
 }
 
 // Find first entry that matches the specified element,
