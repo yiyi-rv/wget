@@ -1514,7 +1514,7 @@ int wget_http_open(wget_http_connection_t **_conn, const wget_iri_t *iri)
 
 void wget_http_close(wget_http_connection_t **conn)
 {
-	if (conn && *conn) {
+	if (*conn) {
 		wget_tcp_deinit(&(*conn)->tcp);
 //		if (!wget_tcp_get_dns_caching())
 //			freeaddrinfo((*conn)->addrinfo);

@@ -1224,8 +1224,6 @@ void
 	wget_ssl_set_config_string(int key, const char *value);
 void
 	wget_ssl_set_config_int(int key, int value);
-//void *
-//	wget_ssl_open(int sockfd, const char *hostname, int connect_timeout) G_GNUC_WGET_NONNULL((2));
 int
 	wget_ssl_open(wget_tcp_t *tcp);
 void
@@ -1237,8 +1235,8 @@ void
 	wget_ssl_server_init(void);
 void
 	wget_ssl_server_deinit(void);
-void *
-	wget_ssl_server_open(int sockfd, int connect_timeout);
+int
+	wget_ssl_server_open(wget_tcp_t *tcp);
 void
 	wget_ssl_server_close(void **session);
 
@@ -1419,7 +1417,7 @@ const char *
 const char *
 	wget_http_parse_connection(const char *s, char *keep_alive) G_GNUC_WGET_NONNULL_ALL;
 const char *
-	wget_http_parse_setcookie(const char *s, wget_cookie_t *cookie) G_GNUC_WGET_NONNULL_ALL;
+	wget_http_parse_setcookie(const char *s, wget_cookie_t *cookie) G_GNUC_WGET_NONNULL((1));
 const char *
 	wget_http_parse_etag(const char *s, const char **etag) G_GNUC_WGET_NONNULL((1));
 

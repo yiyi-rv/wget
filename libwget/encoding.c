@@ -106,7 +106,7 @@ char *wget_charset_transcode(const char *src, const char *src_encoding, const ch
 				ret = strndup(dst, dst_len - dst_len_tmp);
 				debug_printf("converted '%s' (%s) -> '%s' (%s)\n", src, src_encoding, ret, dst_encoding);
 			} else
-				error_printf(_("Failed to convert '%s' string into '%s' (%d)\n"), src_encoding, dst_encoding, errno);
+				error_printf(_("Failed to convert '%s' string into '%s' (%d): '%s'\n"), src_encoding, dst_encoding, errno, src);
 
 			xfree(dst);
 			iconv_close(cd);
@@ -125,6 +125,11 @@ int wget_str_needs_encoding(const char *s)
 	while (*s && (*s & ~0x7f) == 0) s++;
 
 	return !!*s;
+}
+
+char *wget_str_to_utf8(const char *src, const char *encoding)
+{
+	return wget_charset_transcode(src, encoding, "utf-8");
 }
 
 int wget_str_is_valid_utf8(const char *utf8)
@@ -151,11 +156,6 @@ int wget_str_is_valid_utf8(const char *utf8)
 	}
 
 	return 1;
-}
-
-char *wget_str_to_utf8(const char *src, const char *encoding)
-{
-	return wget_charset_transcode(src, encoding, "utf-8");
 }
 
 char *wget_utf8_to_str(const char *src, const char *encoding)
@@ -210,13 +210,27 @@ const char *wget_str_to_ascii(const char *src)
 		char *asc = NULL;
 		int rc;
 
-		// idna_to_ascii_8z() automatically converts UTF-8 to lowercase
+/*
+ * Work around a libidn <= 1.30 vulnerability.
+ *
+ * The function checks for a valid UTF-8 character sequence before
+ * passing it to idna_to_ascii_8z().
+ *
+ * [1] http://lists.gnu.org/archive/html/help-libidn/2015-05/msg00002.html
+ * [2] https://lists.gnu.org/archive/html/bug-wget/2015-06/msg00002.html
+ * [3] http://curl.haxx.se/mail/lib-2015-06/0143.html
+ */
+		if (wget_is_valid_utf8(src)) {
+			// idna_to_ascii_8z() automatically converts UTF-8 to lowercase
 
-		if ((rc = idna_to_ascii_8z(src, &asc, IDNA_USE_STD3_ASCII_RULES)) == IDNA_SUCCESS) {
-			// debug_printf("toASCII '%s' -> '%s'\n", src, asc);
-			src = asc;
-		} else
-			error_printf(_("toASCII failed (%d): %s\n"), rc, idna_strerror(rc));
+			if ((rc = idna_to_ascii_8z(src, &asc, IDNA_USE_STD3_ASCII_RULES)) == IDNA_SUCCESS) {
+				// debug_printf("toASCII '%s' -> '%s'\n", src, asc);
+				src = asc;
+			} else
+				error_printf(_("toASCII failed (%d): %s\n"), rc, idna_strerror(rc));
+		}
+		else
+			error_printf(_("Invalid UTF-8 sequence not converted: '%s'\n"), src);
 	}
 #else
 	if (wget_str_needs_encoding(src)) {

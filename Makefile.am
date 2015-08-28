@@ -41,7 +41,7 @@ distuninstallcheck_listfiles = find . -type f | \
 ACLOCAL_AMFLAGS = -I m4
 
 # subdirectories in the distribution
-SUBDIRS = lib src doc po include libwget src2 examples tests util testenv
+SUBDIRS = lib src doc po include libwget src2 examples tests tests2 util testenv
 
 EXTRA_DIST = MAILING-LIST \
              msdos/config.h msdos/Makefile.DJ \

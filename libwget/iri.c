@@ -698,10 +698,14 @@ char *wget_iri_get_path(const wget_iri_t *iri, wget_buffer_t *buf, const char *e
 
 	if (iri->path) {
 		if (wget_strcasecmp_ascii(encoding, "utf-8")) {
-			char *fname = wget_utf8_to_str(iri->path, encoding);
-			if (fname) {
+			char *fname;
+			
+			if ((fname = wget_utf8_to_str(iri->path, encoding))) {
 				wget_buffer_strcat(buf, fname);
 				xfree(fname);
+			} else {
+				// conversion failed, keep original string
+				wget_buffer_strcat(buf, iri->path);
 			}
 		} else {
 			wget_buffer_strcat(buf, iri->path);
@@ -725,38 +729,37 @@ char *wget_iri_get_query_as_filename(const wget_iri_t *iri, wget_buffer_t *buf, 
 		if (wget_strcasecmp_ascii(encoding, "utf-8")) {
 			if ((query = wget_utf8_to_str(iri->query, encoding)))
 				allocated = 1;
-		} else {
+			else
+				query = iri->query;
+		} else
 			query = iri->query;
+
+		int slashes = 0;
+		const char *src = query;
+
+		// count slashes in query string
+		while ((src = strchr(src, '/'))) {
+			slashes++;
+			src++;
 		}
 
-		if (query) {
-			int slashes = 0;
-			const char *src = query;
+		if (slashes) {
+			// escape slashes to use query as part of a filename
+			const char *begin;
 
-			// count slashes in query string
-			while ((src = strchr(src, '/'))) {
-				slashes++;
-				src++;
-			}
-
-			if (slashes) {
-				// escape slashes to use query as part of a filename
-				const char *begin;
-
-				for (src = begin = query; *src; src++) {
-					if (*src == '/') {
-						if (begin != src)
-							wget_buffer_memcat(buf, begin, src - begin);
-						begin = src + 1;
-						wget_buffer_memcat(buf, "%2F", 3);
-					}
+			for (src = begin = query; *src; src++) {
+				if (*src == '/') {
+					if (begin != src)
+						wget_buffer_memcat(buf, begin, src - begin);
+					begin = src + 1;
+					wget_buffer_memcat(buf, "%2F", 3);
 				}
-
-				if (begin != src)
-					wget_buffer_memcat(buf, begin, src - begin);
-			} else {
-				wget_buffer_strcat(buf, query);
 			}
+
+			if (begin != src)
+				wget_buffer_memcat(buf, begin, src - begin);
+		} else {
+			wget_buffer_strcat(buf, query);
 		}
 
 		if (allocated)
@@ -769,15 +772,19 @@ char *wget_iri_get_query_as_filename(const wget_iri_t *iri, wget_buffer_t *buf, 
 char *wget_iri_get_filename(const wget_iri_t *iri, wget_buffer_t *buf, const char *encoding)
 {
 	if (iri->path) {
-		char *fname;
+		char *fname, *p;
 
 		if (wget_strcasecmp_ascii(encoding, "utf-8")) {
-			if ((fname = strrchr(iri->path, '/')))
-				fname = wget_utf8_to_str(fname + 1, encoding);
-			else
-				fname = wget_utf8_to_str(iri->path, encoding);
+			if ((p = strrchr(iri->path, '/'))) {
+				if (!(fname = wget_utf8_to_str(p + 1, encoding)))
+					wget_buffer_strcat(buf, p + 1); // conversion failed, keep original string
+			} else {
+				if (!(fname = wget_utf8_to_str(iri->path, encoding)))
+					wget_buffer_strcat(buf, iri->path); // conversion failed, keep original string
+			}
 
 			if (fname) {
+				// conversion succeeded
 				wget_buffer_strcat(buf, fname);
 				xfree(fname);
 			}

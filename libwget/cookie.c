@@ -57,20 +57,20 @@ struct wget_cookie_db_st {
 int wget_cookie_db_load_psl(wget_cookie_db_t *cookie_db, const char *fname)
 {
 #ifdef HAVE_LIBPSL
-		if (fname) {
-			psl_ctx_t *psl = psl_load_file(fname);
+	if (fname) {
+		psl_ctx_t *psl = psl_load_file(fname);
 
-			if (psl)
-				psl_free(cookie_db->psl);
-			cookie_db->psl = psl;
-		} else {
+		if (psl)
 			psl_free(cookie_db->psl);
-			cookie_db->psl = NULL;
-		}
+		cookie_db->psl = psl;
+	} else {
+		psl_free(cookie_db->psl);
+		cookie_db->psl = psl_builtin();
+	}
 
-		return 0;
+	return 0;
 #else
-		return -1;
+	return -1;
 #endif
 }
 

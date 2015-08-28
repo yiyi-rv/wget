@@ -180,10 +180,11 @@ struct addrinfo *wget_tcp_resolve(wget_tcp_t *tcp, const char *host, const char 
 	if (!tcp)
 		tcp = &_global_tcp;
 
-	if (!port)
-		port = "0";
+//	if (!port)
+//		port = "0";
 
-	if (tcp->caching) {
+	// if port is NULL,
+	if (tcp->caching && port) {
 		if ((addrinfo = _wget_dns_cache_get(host, port)))
 			return addrinfo;
 
@@ -198,7 +199,7 @@ struct addrinfo *wget_tcp_resolve(wget_tcp_t *tcp, const char *host, const char 
 	addrinfo = NULL;
 
 #if defined(AI_NUMERICSERV)
-	ai_flags |= (isdigit(*port) ? AI_NUMERICSERV : 0);
+	ai_flags |= (port && isdigit(*port) ? AI_NUMERICSERV : 0);
 #endif
 #if defined(AI_ADDRCONFIG)
 	ai_flags |= AI_ADDRCONFIG;
@@ -249,7 +250,7 @@ struct addrinfo *wget_tcp_resolve(wget_tcp_t *tcp, const char *host, const char 
 	if (rc) {
 		error_printf(_("Failed to resolve %s:%s (%s)\n"), host, port, gai_strerror(rc));
 
-		if (tcp->caching)
+		if (tcp->caching && port)
 			wget_thread_mutex_unlock(&mutex);
 
 		return NULL;
@@ -302,7 +303,7 @@ struct addrinfo *wget_tcp_resolve(wget_tcp_t *tcp, const char *host, const char 
 		}
 	}
 
-	if (tcp->caching) {
+	if (tcp->caching && port) {
 		// In case of a race condition the already exisiting addrinfo is returned.
 		// The addrinfo argument given to _wget_dns_cache_add() will be freed in this case.
 		addrinfo = _wget_dns_cache_add(host, port, addrinfo);
@@ -609,7 +610,7 @@ int wget_tcp_connect(wget_tcp_t *tcp, const char *host, const char *port)
 							break; /* stop here - the server cert couldn't be validated */
 						}
 						
-						// do not free tcp->addrinfo when calling mget_tcp_close()
+						// do not free tcp->addrinfo when calling wget_tcp_close()
 						struct addrinfo *ai_tmp = tcp->addrinfo;
 						tcp->addrinfo = NULL;
 						wget_tcp_close(tcp);
@@ -735,29 +736,18 @@ wget_tcp_t *wget_tcp_accept(wget_tcp_t *parent_tcp)
 
 int wget_tcp_tls_start(wget_tcp_t *tcp)
 {
-	int ret;
-
-	// TODO: unify wget_ssl_open and wget_ssl_server_open
-	if (tcp->passive) {
-		if ((tcp->ssl_session = wget_ssl_server_open(tcp->sockfd, tcp->connect_timeout))) {
-			return 0;
-		}
-		ret = WGET_E_UNKNOWN;
-	} else {
+	if (tcp->passive)
+		return wget_ssl_server_open(tcp);
+	else
 		return wget_ssl_open(tcp);
-	}
-
-	return ret;
 }
 
-void mget_tcp_tls_stop(wget_tcp_t *tcp)
+void wget_tcp_tls_stop(wget_tcp_t *tcp)
 {
-	if (tcp->ssl_session) {
-		if (tcp->passive)
-			wget_ssl_server_close(&tcp->ssl_session);
-		else
-			wget_ssl_close(&tcp->ssl_session);
-	}
+	if (tcp->passive)
+		wget_ssl_server_close(&tcp->ssl_session);
+	else
+		wget_ssl_close(&tcp->ssl_session);
 }
 
 ssize_t wget_tcp_read(wget_tcp_t *tcp, char *buf, size_t count)
@@ -788,7 +778,7 @@ ssize_t wget_tcp_write(wget_tcp_t *tcp, const char *buf, size_t count)
 	ssize_t nwritten = 0, n;
 	int rc;
 
-	if (tcp->ssl)
+	if (tcp->ssl_session)
 		return wget_ssl_write_timeout(tcp->ssl_session, buf, count, tcp->timeout);
 
 	while (count) {
@@ -885,12 +875,7 @@ ssize_t wget_tcp_printf(wget_tcp_t *tcp, const char *fmt, ...)
 void wget_tcp_close(wget_tcp_t *tcp)
 {
 	if (tcp) {
-		if (tcp->ssl && tcp->ssl_session) {
-			if (tcp->passive)
-				wget_ssl_server_close(&tcp->ssl_session);
-			else
-				wget_ssl_close(&tcp->ssl_session);
-		}
+		wget_tcp_tls_stop(tcp);
 		if (tcp->sockfd != -1) {
 			close(tcp->sockfd);
 			tcp->sockfd = -1;
