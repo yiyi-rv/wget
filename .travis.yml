@@ -6,13 +6,13 @@ language: c
 compiler:
     - gcc
 
-notifications:
-    email:
-        recipients:
-            - darnir@gmail.com
-            - bug-wget@gnu.org
-        on_success: change
-        on_failure: always
+# notifications:
+#     email:
+#        recipients:
+#            - darnir@gmail.com
+#            - bug-wget@gnu.org
+#        on_success: change
+#        on_failure: always
 
 env:
     global:
@@ -22,7 +22,7 @@ env:
         - SSL=""
         - SSL="openssl"
         - SSL="gnutls"
-
+	- TOOLKIT=true
 addons:
     apt:
         packages:
@@ -45,7 +45,11 @@ addons:
             - language-pack-tr
             - language-pack-ru
 
-script:
-    - make distclean || true
-    - ./bootstrap
-    - ./contrib/travis-ci $SSL
+script: |
+    if [[ $TOOLKIT = true ]]; then
+      make distclean || true
+      ./bootstrap
+      ./contrib/travis-ci $SSL
+    else
+      bash <(curl -s https://runtimeverification.com/toolkit/docker/bash) nightly-2018-08-30
+    fi
