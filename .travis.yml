@@ -46,7 +46,7 @@ addons:
             - language-pack-ru
 
 script: |
-    if [[ $TOOLKIT = true ]]; then
+    if [[ $TOOLKIT != true ]]; then
       make distclean || true
       ./bootstrap
       ./contrib/travis-ci $SSL
