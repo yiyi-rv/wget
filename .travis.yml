@@ -37,7 +37,7 @@ addons:
             - make
             - libhttp-daemon-perl
             - libio-socket-ssl-perl
-            - libidn2-dev
+            - libidn2-0-dev
             - gettext
             - texlive
             - python3
